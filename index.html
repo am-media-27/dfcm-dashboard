@@ -45,8 +45,19 @@
 .sh.cld .chv{transform:rotate(-90deg)}
 .sb{border:1px solid var(--bd);border-top:0;border-radius:0 0 var(--r) var(--r);overflow:hidden}
 .sb.hdn{display:none}
-.rw{display:grid;grid-template-columns:24px 155px 1fr 50px 62px 95px;gap:8px;padding:8px 14px;border-bottom:1px solid var(--bd);align-items:center;font-size:12px;cursor:pointer}
+.rw{display:grid;grid-template-columns:24px 155px 1fr 50px 62px 180px;gap:8px;padding:8px 14px;border-bottom:1px solid var(--bd);align-items:center;font-size:12px;cursor:pointer}
 .rw:last-child{border-bottom:0}.rw:hover{background:#FAFAF7}.rw.act{background:var(--nl);border-left:3px solid var(--ac)}
+.rw-actions{display:flex;gap:4px;align-items:center}
+.rw-abtn{padding:4px 10px;border-radius:5px;border:0;font:600 10px 'DM Sans',sans-serif;cursor:pointer;white-space:nowrap}
+.rw-ap{background:var(--gn);color:#fff}.rw-ap:hover{background:#047857}
+.rw-dc{background:var(--sf);color:var(--rd);border:1px solid var(--rd)}.rw-dc:hover{background:var(--rb)}
+.rw-vw{background:var(--nl);color:var(--ac);border:1px solid var(--ac)}.rw-vw:hover{background:var(--ac);color:#fff}
+.decline-box{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--sf);border:1px solid var(--bd);border-radius:var(--r);padding:20px;width:400px;max-width:90vw;box-shadow:0 8px 30px rgba(0,0,0,.15);z-index:250}
+.decline-box h4{font:600 14px 'DM Sans',sans-serif;color:var(--rd);margin-bottom:10px}
+.decline-box textarea{width:100%;min-height:80px;padding:8px 12px;border:1.5px solid var(--bd);border-radius:var(--rs);font:400 12px 'DM Sans',sans-serif;outline:0;margin-bottom:10px;resize:vertical}
+.decline-box textarea:focus{border-color:var(--rd)}
+.decline-box .db-actions{display:flex;gap:8px;justify-content:flex-end}
+.decline-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:240}.decline-bg.on{display:block}
 .rn{font-size:10px;color:var(--t3)}
 .rp{font-weight:600;color:var(--tx);font-size:12px}
 .rww{color:var(--t2);font-size:11px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -152,6 +163,15 @@
 <div class="ov" id="ov" onclick="closeP()"></div>
 <div class="pn" id="pn"><div class="ph"><div><div class="phtt" id="pT"></div><div class="phst" id="pS"></div></div><button class="pcl" onclick="closeP()">&times;</button></div><div class="pbdy" id="pB"></div><div class="pftr"><div><button class="btn bsv" onclick="saveClose()">Save &amp; close</button> <button class="btn bnx" onclick="saveNext()">Save &amp; next</button> <button class="btn bgh" onclick="closeP()">Cancel</button></div><span class="saved" id="svd">Saved</span></div></div>
 <div class="toast" id="toast"></div>
+<div class="decline-bg" id="decBg" onclick="closeDecline()"></div>
+<div class="decline-box" id="decBox" style="display:none">
+  <h4>Decline — add your feedback</h4>
+  <textarea id="decComment" placeholder="What needs to change? Be specific so the writer knows what to fix..."></textarea>
+  <div class="db-actions">
+    <button class="btn bgh" onclick="closeDecline()">Cancel</button>
+    <button class="btn" style="background:var(--rd);color:#fff" onclick="submitDecline()">Decline &amp; notify</button>
+  </div>
+</div>
 
 <!-- Quick Upload Modal -->
 <div class="modal-bg" id="quModal">
@@ -368,7 +388,12 @@ function render(){
     var rows=sec.items.map(function(it,ii){
       num++;var k=si+"-"+ii,st=gst(k),hasContent=!!gs(k,"title")||!!gs(k,"body")||!!gs(k,"brand");
       var isRev=st==="Revise";
-      return"<div class='rw"+(ck===k?" act":"")+"' data-t='"+it.t+"' data-s='"+st+"' onclick=\"openP('"+k+"')\"><span class='rn'>"+num+"</span><span><span class='rp'>"+(isRev?"\u26A0\uFE0F ":"")+it.p+"</span><div class='dots'><div class='dot "+(hasContent?"d1":"d0")+"'></div></div></span><span class='rww'>"+it.w+"</span><span class='rc'>"+it.c+"</span><span><span class='tg "+TC[it.t]+"'>"+TL[it.t]+"</span></span><span><span class='sm sm"+ST.indexOf(st)+"'>"+st+"</span></span></div>"
+      var isReview=st==="Review";
+      var actionBtns="";
+      if(isReview){
+        actionBtns="<div class='rw-actions'><button class='rw-abtn rw-vw' onclick='event.stopPropagation();openP(\""+k+"\")'>View</button><button class='rw-abtn rw-ap' onclick='event.stopPropagation();quickApprove(\""+k+"\")'>Approve</button><button class='rw-abtn rw-dc' onclick='event.stopPropagation();openDecline(\""+k+"\")'>Decline</button></div>";
+      }
+      return"<div class='rw"+(ck===k?" act":"")+"' data-t='"+it.t+"' data-s='"+st+"' onclick=\"openP('"+k+"')\"><span class='rn'>"+num+"</span><span><span class='rp'>"+(isRev?"\u26A0\uFE0F ":"")+it.p+"</span><div class='dots'><div class='dot "+(hasContent?"d1":"d0")+"'></div></div></span><span class='rww'>"+it.w+"</span><span class='rc'>"+it.c+"</span><span><span class='tg "+TC[it.t]+"'>"+TL[it.t]+"</span></span><span>"+(isReview?actionBtns:"<span class='sm sm"+ST.indexOf(st)+"'>"+st+"</span>")+"</span></div>"
     }).join("");
     var sp="";ST.forEach(function(s){var cn=0;sec.items.forEach(function(_,ii){if(gst(si+"-"+ii)===s)cn++});sp+="<div class='spf' style='width:"+(sec.items.length?(cn/sec.items.length*100):0)+"%;background:"+SC[s]+"'></div>"});
     html+="<div class='sec'><div class='sh' onclick='togSec("+si+")'><span><span class='stt'>"+sec.s+"</span><span class='sc'>("+sec.items.length+")</span></span><div style='display:flex;align-items:center'><div class='spb'>"+sp+"</div><span class='chv'>\u25BE</span></div></div><div class='sb' id='sb"+si+"'>"+rows+"</div></div>";
@@ -492,6 +517,45 @@ function saveP(){
 function saveClose(){saveP();closeP()}
 function saveNext(){saveP();var ki=allK.indexOf(ck),next=ki<allK.length-1?allK[ki+1]:null;if(next)openP(next);else closeP()}
 function closeP(){document.getElementById("pn").classList.remove("on");document.getElementById("ov").classList.remove("on");ck=null;render()}
+
+// ── INLINE APPROVE / DECLINE ──
+var declineKey=null;
+function quickApprove(k){
+  var s=ld();if(!s[k])s[k]={};
+  s[k].status="Approved";sv(s);
+  var inf=fi(k);
+  var data=s[k];
+  var details=["title","body","brand","cta"].filter(function(f){return data[f]}).map(function(f){return f+": "+data[f].substring(0,60)}).join(" | ");
+  notifyTeams("approved",inf.item.p,inf.sec.s,"All content approved. "+details);
+  showToast("Approved: "+inf.item.p);
+  render();
+}
+function openDecline(k){
+  declineKey=k;
+  document.getElementById("decComment").value="";
+  document.getElementById("decBg").classList.add("on");
+  document.getElementById("decBox").style.display="block";
+  document.getElementById("decComment").focus();
+}
+function closeDecline(){
+  declineKey=null;
+  document.getElementById("decBg").classList.remove("on");
+  document.getElementById("decBox").style.display="none";
+}
+function submitDecline(){
+  if(!declineKey)return;
+  var comment=document.getElementById("decComment").value.trim();
+  if(!comment){document.getElementById("decComment").style.borderColor="var(--rd)";document.getElementById("decComment").placeholder="Please add your feedback before declining...";return}
+  var s=ld();if(!s[declineKey])s[declineKey]={};
+  s[declineKey].status="Revise";
+  s[declineKey].note=((s[declineKey].note||"")+(s[declineKey].note?"\n":"")+"[Reviewer] "+comment).trim();
+  sv(s);
+  var inf=fi(declineKey);
+  notifyTeams("revision",inf.item.p,inf.sec.s,"Declined: "+comment);
+  showToast("Declined: "+inf.item.p);
+  closeDecline();
+  render();
+}
 
 // ── QUICK UPLOAD MODAL ──
 function openQU(){
