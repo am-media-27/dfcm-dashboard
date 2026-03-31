@@ -338,7 +338,7 @@ function getFields(type){
     {id:"title",lbl:"Offer title",tag:"input"},
     {id:"body",lbl:"Offer description",tag:"textarea"},
     {id:"tc",lbl:"Terms & conditions",tag:"textarea",cls:"fld-sm"},
-    {id:"cta",lbl:"CTA button text",tag:"input"},
+    {id:"cta",lbl:"CTA button text",tag:"select",opts:["Shop Now","Book Now","Reserve","Inquire","Register","Learn More","Explore","Get Directions","View Menu","Buy Now","Sign Up","Download","Contact Us","View Offer","Redeem Now","Get Started","Find Out More","Apply Now","Subscribe","Claim Offer"]},
     {id:"sqimg",lbl:"Square image (1:1)",tag:"file",accept:"image/*",hint:"1080x1080px recommended"},
     {id:"banimg",lbl:"Banner image (16:9)",tag:"file",accept:"image/*",hint:"1920x800px recommended"}
   ];
@@ -347,7 +347,7 @@ function getFields(type){
     {id:"body",lbl:"Description",tag:"textarea"},
     {id:"hours",lbl:"Opening hours",tag:"input"},
     {id:"contact",lbl:"Contact info",tag:"input"},
-    {id:"cta",lbl:"CTA button text",tag:"input"},
+    {id:"cta",lbl:"CTA button text",tag:"select",opts:["Shop Now","Book Now","Reserve","Inquire","Register","Learn More","Explore","Get Directions","View Menu","Buy Now","Sign Up","Download","Contact Us","View Offer","Redeem Now","Get Started","Find Out More","Apply Now","Subscribe","Claim Offer"]},
     {id:"img",lbl:"Main image",tag:"file",accept:"image/*",hint:"800x600px recommended"}
   ];
   if(type==="form") return [
@@ -360,14 +360,14 @@ function getFields(type){
     {id:"title",lbl:"Page title",tag:"input"},
     {id:"body",lbl:"Page content",tag:"textarea"},
     {id:"howit",lbl:"How it works (steps)",tag:"textarea",cls:"fld-sm"},
-    {id:"cta",lbl:"CTA button text",tag:"input"},
+    {id:"cta",lbl:"CTA button text",tag:"select",opts:["Shop Now","Book Now","Reserve","Inquire","Register","Learn More","Explore","Get Directions","View Menu","Buy Now","Sign Up","Download","Contact Us","View Offer","Redeem Now","Get Started","Find Out More","Apply Now","Subscribe","Claim Offer"]},
     {id:"img",lbl:"Image / illustration",tag:"file",accept:"image/*",hint:"800x600px recommended"}
   ];
   // landing (default)
   return [
     {id:"title",lbl:"Page title",tag:"input"},
     {id:"body",lbl:"Body content",tag:"textarea"},
-    {id:"cta",lbl:"CTA button text",tag:"input"},
+    {id:"cta",lbl:"CTA button text",tag:"select",opts:["Shop Now","Book Now","Reserve","Inquire","Register","Learn More","Explore","Get Directions","View Menu","Buy Now","Sign Up","Download","Contact Us","View Offer","Redeem Now","Get Started","Find Out More","Apply Now","Subscribe","Claim Offer"]},
     {id:"img",lbl:"Hero / main image",tag:"file",accept:"image/*",hint:"1200x600px recommended"}
   ];
 }
@@ -413,6 +413,7 @@ function openP(k){
   var type=getType(k),fields=getFields(type);
   var status=saved.status||"Not started";
   var isRev=status==="Revise";
+  var isReview=status==="Review";
   var note=saved.note||"";
 
   document.getElementById("pT").textContent=item.p;
@@ -432,6 +433,11 @@ function openP(k){
     if(f.tag==="textarea"){
       return"<div class='psec'><div class='lbl'>"+f.lbl+"</div><textarea class='fld fld-ta "+(f.cls||"")+"' id='pf_"+f.id+"'>"+val+"</textarea></div>";
     }
+    if(f.tag==="select"){
+      var options=f.opts||[];
+      var optHtml="<option value=''>-- Select --</option>"+options.map(function(o){return"<option"+(o===val?" selected":"")+">"+o+"</option>"}).join("");
+      return"<div class='psec'><div class='lbl'>"+f.lbl+"</div><select class='fld' id='pf_"+f.id+"' style='cursor:pointer'>"+optHtml+"</select></div>";
+    }
     return"<div class='psec'><div class='lbl'>"+f.lbl+"</div><input class='fld' id='pf_"+f.id+"' value='"+val.replace(/'/g,"&#39;")+"'></div>";
   }).join("");
 
@@ -442,6 +448,7 @@ function openP(k){
     "<div class='brief'>"+item.w+" \u2014 "+item.c+" characters</div>"+
     fieldsHtml+
     "<div class='psec'><div class='lbl'>Notes</div><textarea class='fld fld-ta fld-sm' id='pf_note'>"+note+"</textarea></div>"+
+    (isReview?"<div style='display:flex;gap:8px;margin-bottom:16px'><button class='btn' style='flex:1;padding:12px;background:var(--gn);color:#fff;font-size:13px' onclick='quickApprove(\""+k+"\");closeP()'>Approve</button><button class='btn' style='flex:1;padding:12px;background:var(--sf);color:var(--rd);border:1.5px solid var(--rd);font-size:13px' onclick='closeP();openDecline(\""+k+"\")'>Decline</button></div>":"")+
     "<div class='pnav'><button "+(prev?"onclick=\"saveP();openP('"+prev+"')\"":"disabled")+">\u2190 "+(prevI?prevI.item.p:"Start")+"</button><button "+(next?"onclick=\"saveP();openP('"+next+"')\"":"disabled")+">"+(nextI?nextI.item.p:"End")+" \u2192</button></div>";
 
   document.getElementById("pn").classList.add("on");
@@ -508,7 +515,7 @@ function saveP(){
   if(data.status==="Review"&&oldSt!=="Review"){
     var inf=fi(ck);
     var details=fields.filter(function(f){return f.tag!=="file"&&data[f.id]}).map(function(f){return f.lbl+": "+data[f.id].substring(0,80)+(data[f.id].length>80?"...":"")}).join(" | ");
-    notifyTeams("review",inf.item.p,inf.sec.s,details);
+    notifyTeams("review",inf.item.p,inf.sec.s,details,ck);
   }
   document.getElementById("svd").classList.add("on");
   setTimeout(function(){document.getElementById("svd").classList.remove("on")},2000);
@@ -526,7 +533,7 @@ function quickApprove(k){
   var inf=fi(k);
   var data=s[k];
   var details=["title","body","brand","cta"].filter(function(f){return data[f]}).map(function(f){return f+": "+data[f].substring(0,60)}).join(" | ");
-  notifyTeams("approved",inf.item.p,inf.sec.s,"All content approved. "+details);
+  notifyTeams("approved",inf.item.p,inf.sec.s,"All content approved.",k);
   showToast("Approved: "+inf.item.p);
   render();
 }
@@ -551,7 +558,7 @@ function submitDecline(){
   s[declineKey].note=((s[declineKey].note||"")+(s[declineKey].note?"\n":"")+"[Reviewer] "+comment).trim();
   sv(s);
   var inf=fi(declineKey);
-  notifyTeams("revision",inf.item.p,inf.sec.s,"Declined: "+comment);
+  notifyTeams("revision",inf.item.p,inf.sec.s,"Declined: "+comment,declineKey);
   showToast("Declined: "+inf.item.p);
   closeDecline();
   render();
@@ -581,6 +588,10 @@ function quPageChanged(){
     }
     if(f.tag==="textarea"){
       return"<div class='psec'><div class='lbl'>"+f.lbl+"</div><textarea class='fld fld-ta "+(f.cls||"")+"' id='qu_"+f.id+"'></textarea></div>";
+    }
+    if(f.tag==="select"){
+      var optHtml="<option value=''>-- Select --</option>"+(f.opts||[]).map(function(o){return"<option>"+o+"</option>"}).join("");
+      return"<div class='psec'><div class='lbl'>"+f.lbl+"</div><select class='fld' id='qu_"+f.id+"' style='cursor:pointer'>"+optHtml+"</select></div>";
     }
     return"<div class='psec'><div class='lbl'>"+f.lbl+"</div><input class='fld' id='qu_"+f.id+"'></div>";
   }).join("");
@@ -614,7 +625,7 @@ function quSubmit(){
 
   // Notify Teams with all details
   var inf=fi(k);
-  notifyTeams("review",inf.item.p,inf.sec.s,details.join("\n"));
+  notifyTeams("review",inf.item.p,inf.sec.s,details.join("\n"),k);
 
   document.getElementById("quStatus").textContent="Submitted! Notification sent to Teams.";
   document.getElementById("quStatus").className="modal-status ok";
@@ -668,10 +679,10 @@ function rvAct(k,ns){
   var inf=fi(k);
   if(ns==="Approved"){
     var details="All content approved for: "+inf.item.p+" ("+inf.sec.s+")";
-    notifyTeams("approved",inf.item.p,inf.sec.s,details);
+    notifyTeams("approved",inf.item.p,inf.sec.s,"Approved.",k);
   }
   if(ns==="Revise"){
-    notifyTeams("revision",inf.item.p,inf.sec.s,"Revision needed: "+(noteVal||"See dashboard for details"));
+    notifyTeams("revision",inf.item.p,inf.sec.s,"Revision: "+(noteVal||"See dashboard"),k);
   }
   var card=document.getElementById("rv-"+k);
   if(card){card.style.transition="all .3s";card.style.opacity="0";card.style.transform="translateX(40px)";setTimeout(renderRV,350)}
@@ -693,22 +704,54 @@ function testTM(){
   });
 }
 
-function sendTeams(url,title,subtitle,text,color){
+function sendTeams(url,title,subtitle,text,color,pageKey){
   if(!url)return Promise.resolve(false);
   var emoji=color==="review"?"\uD83D\uDC41\uFE0F":color==="approved"?"\u2705":color==="revision"?"\u26A0\uFE0F":color==="published"?"\uD83D\uDE80":"\uD83D\uDCCB";
   var ac=color==="approved"?"Good":color==="revision"?"Attention":"Accent";
-  var body={"type":"message","attachments":[{"contentType":"application/vnd.microsoft.card.adaptive","content":{"$schema":"http://adaptivecards.io/schemas/adaptive-card.json","type":"AdaptiveCard","version":"1.4","body":[
+  var dashUrl="https://am-media-27.github.io/dfcm-dashboard/";
+
+  // Build facts from content fields if available
+  var facts=[];
+  if(pageKey){
+    var s=ld(),data=s[pageKey]||{};
+    var fieldMap={"brand":"Brand","title":"Title","body":"Body","cta":"CTA","tc":"T&Cs","hours":"Hours","contact":"Contact","howit":"How it works","fields":"Fields","confirm":"Confirmation","error":"Errors"};
+    Object.keys(fieldMap).forEach(function(fk){
+      if(data[fk]&&data[fk].trim()){
+        var val=data[fk].trim();
+        if(val.length>120)val=val.substring(0,120)+"...";
+        facts.push({"title":fieldMap[fk],"value":val});
+      }
+    });
+  }
+
+  var bodyBlocks=[
     {"type":"TextBlock","text":emoji+" "+title,"size":"Large","weight":"Bolder","color":ac},
-    {"type":"TextBlock","text":subtitle,"wrap":true,"spacing":"Small"},
-    {"type":"TextBlock","text":text.replace(/\n/g,"\n\n"),"wrap":true,"size":"Small","spacing":"Small"}
-  ]}}]};
+    {"type":"TextBlock","text":subtitle,"wrap":true,"spacing":"Small"}
+  ];
+
+  if(facts.length>0){
+    bodyBlocks.push({"type":"FactSet","facts":facts,"spacing":"Medium"});
+  }
+
+  if(text){
+    bodyBlocks.push({"type":"TextBlock","text":text.replace(/\n/g,"\n\n"),"wrap":true,"size":"Small","spacing":"Small","isSubtle":true});
+  }
+
+  var card={"$schema":"http://adaptivecards.io/schemas/adaptive-card.json","type":"AdaptiveCard","version":"1.4",
+    "body":bodyBlocks,
+    "actions":[
+      {"type":"Action.OpenUrl","title":"\uD83D\uDD17 Open Dashboard to Review","url":dashUrl}
+    ]
+  };
+
+  var body={"type":"message","attachments":[{"contentType":"application/vnd.microsoft.card.adaptive","content":card}]};
   return fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(function(r){return r.ok}).catch(function(){return false});
 }
-function notifyTeams(type,pageName,section,detail){
+function notifyTeams(type,pageName,section,detail,pageKey){
   var url=getTMUrl();if(!url)return;
   var titles={"review":"Content submitted for review","approved":"Content approved","revision":"Revision requested","published":"Content published"};
   var sub=pageName+" ("+section+")";
-  sendTeams(url,titles[type]||"DFCM Update",sub,detail||"",type);
+  sendTeams(url,titles[type]||"DFCM Update",sub,detail||"",type,pageKey);
   showToast(titles[type]+": "+pageName);
 }
 function showToast(msg){var t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(function(){t.classList.remove("show")},3500)}
