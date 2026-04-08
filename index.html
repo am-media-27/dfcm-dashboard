@@ -209,7 +209,7 @@ select.field-input { cursor:pointer; }
     <button class="btn-sm" onclick="openSettings()">&#9881; Teams</button>
     <button class="btn-sm" onclick="openBynderSetup()">&#9670; Brand Portal</button>
     <button class="btn-sm btn-blue" onclick="exportExcel()">&#128202; Export Excel</button>
-    <button class="btn-sm" id="autoExcelBtn" onclick="toggleAutoExcel()" title="Auto-download Excel on every save">&#9889; Auto Excel: ON</button>
+    <button class="btn-sm" onclick="openSyncSetup()" id="syncBtn" title="Set up auto-sync to OneDrive Excel">&#128260; Excel Sync</button>
     <button class="btn-sm" onclick="eCSV()">Export CSV</button>
     <button class="btn-sm" onclick="eAll()">Export All</button>
     <button class="btn-sm" onclick="rAll()">Reset</button>
@@ -271,6 +271,38 @@ select.field-input { cursor:pointer; }
       <div class="modal-hint">Your Al-Futtaim Brand Portal URL. Once UCV is enabled by your admin, the "Browse" button inside content cards will open the asset picker directly.</div>
       <button class="btn btn-primary" onclick="saveBynderUrl()">Save</button>
       <div class="modal-status" id="bynderStatus"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== EXCEL SYNC MODAL ===== -->
+<div class="modal-bg" id="syncModal">
+  <div class="modal">
+    <div class="modal-hd"><h3>&#128260; Excel Sync Setup</h3><button class="panel-close" onclick="closeSyncSetup()">&times;</button></div>
+    <div class="modal-bd">
+      <div class="modal-hint" style="background:var(--surf2);padding:12px;border-radius:8px;margin-bottom:14px">
+        <strong style="color:var(--gold)">How this works:</strong><br>
+        Every time someone saves, submits, or approves content in the dashboard, it sends the data to Power Automate, which updates the same row in your shared Excel file on OneDrive. No more downloading files.
+      </div>
+      <label class="modal-lbl">Power Automate Webhook URL</label>
+      <input class="modal-inp" id="syncUrl" placeholder="https://prod-xx.westus.logic.azure.com:443/workflows/...">
+      <div class="modal-hint">
+        <strong>How to get this URL:</strong><br>
+        1. Go to <a href="https://make.powerautomate.com" target="_blank" style="color:var(--blue)">make.powerautomate.com</a><br>
+        2. Create → Instant cloud flow → trigger: <strong>"When an HTTP request is received"</strong><br>
+        3. Paste the JSON schema (click "Copy Schema" below)<br>
+        4. Add action: <strong>"Excel Online (Business)" → "Update a row"</strong><br>
+        5. Point it to your DFCM_Content_Brief.xlsx on OneDrive<br>
+        6. Key Column = <strong>Key</strong>, Key Value = <strong>key</strong> from trigger<br>
+        7. Map each field (Status, Headline, Body, etc.)<br>
+        8. Save the flow → copy the HTTP POST URL → paste above
+      </div>
+      <button class="btn btn-ghost" onclick="copySyncSchema()" style="margin-bottom:12px">&#128203; Copy JSON Schema</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" onclick="testSync()">Send Test</button>
+        <button class="btn btn-primary" onclick="saveSyncUrl()">Save</button>
+      </div>
+      <div class="modal-status" id="syncStatus"></div>
     </div>
   </div>
 </div>
@@ -701,19 +733,8 @@ function saveP(){
   render();
   showToast("Saved: "+fi(ck).item.p);
   
-  // Auto-export Excel
-  if(localStorage.getItem("dfcm_auto_excel")!=="off"){
-    autoExportExcel();
-  }
-}
-
-function autoExportExcel(){
-  if(typeof XLSX==="undefined") return;
-  // Debounce: don't export more than once every 5 seconds
-  if(autoExportExcel._t) clearTimeout(autoExportExcel._t);
-  autoExportExcel._t=setTimeout(function(){
-    exportExcel(true);
-  },1500);
+  // Sync to OneDrive Excel via Power Automate
+  syncToExcel(ck);
 }
 
 function saveAndNext(){
@@ -745,7 +766,7 @@ function submitForReview(){
   render();
   showToast("Submitted for review: "+inf.item.p);
   closeP();
-  if(localStorage.getItem("dfcm_auto_excel")!=="off") autoExportExcel();
+  syncToExcel(ck);
 }
 
 // ─── FILES ───
@@ -922,7 +943,7 @@ function rvAct(k,ns){
   var card=document.getElementById("rv-"+k);
   if(card){card.style.transition="all .3s";card.style.opacity="0";card.style.transform="translateX(40px)";setTimeout(function(){renderReview();render();},350);}
   else { renderReview(); render(); }
-  if(localStorage.getItem("dfcm_auto_excel")!=="off") autoExportExcel();
+  syncToExcel(k);
 }
 
 // ─── TABS ───
@@ -1296,8 +1317,8 @@ function quSubmit(){
     closeQU();
     showToast("Content uploaded & submitted: "+inf.item.p);
     
-    // Auto-export Excel
-    if(localStorage.getItem("dfcm_auto_excel")!=="off") autoExportExcel();
+    // Sync to OneDrive Excel
+    syncToExcel(k);
   });
 }
 
@@ -1312,22 +1333,109 @@ document.addEventListener("DOMContentLoaded",function(){
 });
 
 // ─── INIT ───
-function toggleAutoExcel(){
-  var cur=localStorage.getItem("dfcm_auto_excel");
-  if(cur==="off"){ localStorage.setItem("dfcm_auto_excel","on"); }
-  else { localStorage.setItem("dfcm_auto_excel","off"); }
-  updateAutoExcelBtn();
+// ─── EXCEL SYNC (Power Automate) ───
+function openSyncSetup(){
+  document.getElementById("syncUrl").value=localStorage.getItem("dfcm_sync_url")||"";
+  document.getElementById("syncStatus").innerHTML="";
+  document.getElementById("syncModal").classList.add("open");
 }
-function updateAutoExcelBtn(){
-  var btn=document.getElementById("autoExcelBtn");
+function closeSyncSetup(){ document.getElementById("syncModal").classList.remove("open"); }
+function saveSyncUrl(){
+  var url=document.getElementById("syncUrl").value.trim();
+  if(!url){ document.getElementById("syncStatus").innerHTML='<span style="color:var(--red)">Paste the Power Automate URL first</span>'; return; }
+  localStorage.setItem("dfcm_sync_url",url);
+  document.getElementById("syncStatus").innerHTML='<span style="color:var(--green)">Saved! Dashboard will now auto-sync to your Excel on OneDrive.</span>';
+  updateSyncBtn();
+  setTimeout(closeSyncSetup,1500);
+}
+function updateSyncBtn(){
+  var btn=document.getElementById("syncBtn");
   if(!btn) return;
-  var on=localStorage.getItem("dfcm_auto_excel")!=="off";
-  btn.innerHTML="&#9889; Auto Excel: "+(on?"ON":"OFF");
+  var on=!!localStorage.getItem("dfcm_sync_url");
   btn.style.background=on?"var(--green)":"var(--surf2)";
   btn.style.color=on?"#000":"var(--t2)";
   btn.style.borderColor=on?"var(--green)":"var(--border)";
+  btn.innerHTML=on?"&#128260; Synced":"&#128260; Excel Sync";
 }
-openDB().then(function(){ render(); updateAutoExcelBtn(); });
+
+function copySyncSchema(){
+  var schema=JSON.stringify({
+    "type":"object",
+    "properties":{
+      "key":{"type":"string"},
+      "section":{"type":"string"},
+      "page":{"type":"string"},
+      "status":{"type":"string"},
+      "headline":{"type":"string"},
+      "subheadline":{"type":"string"},
+      "body":{"type":"string"},
+      "caption":{"type":"string"},
+      "cta_text":{"type":"string"},
+      "cta_url":{"type":"string"},
+      "hashtags":{"type":"string"},
+      "notes":{"type":"string"},
+      "figma":{"type":"string"},
+      "brand_portal":{"type":"string"},
+      "updated_at":{"type":"string"},
+      "updated_by":{"type":"string"}
+    }
+  },null,2);
+  navigator.clipboard.writeText(schema).then(function(){
+    document.getElementById("syncStatus").innerHTML='<span style="color:var(--green)">Schema copied to clipboard! Paste it in Power Automate.</span>';
+  });
+}
+
+function testSync(){
+  var url=document.getElementById("syncUrl").value.trim();
+  if(!url){ document.getElementById("syncStatus").innerHTML='<span style="color:var(--red)">Paste URL first</span>'; return; }
+  document.getElementById("syncStatus").innerHTML='<span style="color:var(--amber)">Sending test...</span>';
+  fetch(url,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      key:"test",section:"Test",page:"Test Page",status:"Writing",
+      headline:"Test headline from dashboard",subheadline:"",body:"This is a test sync.",
+      caption:"",cta_text:"",cta_url:"",hashtags:"",notes:"",figma:"",brand_portal:"",
+      updated_at:new Date().toLocaleString(),updated_by:"Dashboard Test"
+    })
+  }).then(function(r){
+    if(r.ok) document.getElementById("syncStatus").innerHTML='<span style="color:var(--green)">Test sent! Check your Excel on OneDrive for a "Test Page" row.</span>';
+    else document.getElementById("syncStatus").innerHTML='<span style="color:var(--red)">Error: '+r.status+'. Check your Power Automate flow.</span>';
+  }).catch(function(e){
+    document.getElementById("syncStatus").innerHTML='<span style="color:var(--red)">Failed: '+e.message+'</span>';
+  });
+}
+
+function syncToExcel(k){
+  var url=localStorage.getItem("dfcm_sync_url");
+  if(!url) return;
+  var s=ld(), v=s[k]||{}, inf=fi(k);
+  var payload={
+    key:k,
+    section:inf.sec.s,
+    page:inf.item.p,
+    status:v.status||"Not started",
+    headline:v.bf_headline||"",
+    subheadline:v.bf_subheadline||"",
+    body:v.bf_body||"",
+    caption:v.bf_caption||"",
+    cta_text:v.bf_cta_text||"",
+    cta_url:v.bf_cta_url||"",
+    hashtags:v.bf_hashtags||"",
+    notes:v.bf_notes||"",
+    figma:v.figma||"",
+    brand_portal:v.brandPortalLink||"",
+    updated_at:new Date().toLocaleString(),
+    updated_by:"Dashboard"
+  };
+  fetch(url,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(payload)
+  }).catch(function(e){ console.error("Sync error:",e); });
+}
+
+openDB().then(function(){ render(); updateSyncBtn(); });
 </script>
 </body>
 </html>
